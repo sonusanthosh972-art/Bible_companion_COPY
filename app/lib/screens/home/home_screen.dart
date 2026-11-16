@@ -52,13 +52,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _greetingName(AppState app, AppLocalizations l) =>
-      app.user?.displayName ?? l.t('drawer_guest');
+      // Guests get the localized "Guest" label; the backend stores it as the
+      // English "Guest" display name, which would otherwise show on Hindi/Tamil.
+      app.isGuest ? l.t('drawer_guest') : (app.user?.displayName ?? l.t('drawer_guest'));
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final app = context.watch<AppState>();
-    final name = _greetingName(app, l);
 
     return Scaffold(
       body: SafeArea(
@@ -73,13 +73,21 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _header(context, l),
               const SizedBox(height: 18),
-              _greeting(context, name),
+              // Only the greeting depends on the user's name — scope the rebuild
+              // so leaderboard/XP refreshes don't rebuild the whole screen.
+              Selector<AppState, String>(
+                selector: (_, app) => _greetingName(app, l),
+                builder: (context, name, _) => _greeting(context, name),
+              ),
               const SizedBox(height: 16),
               _verseCard(context, l),
               const SizedBox(height: 22),
               _feelingRow(context, l),
               const SizedBox(height: 22),
-              _readingCard(context, l, app),
+              // Reading progress is the only other AppState-dependent piece.
+              Consumer<AppState>(
+                builder: (context, app, _) => _readingCard(context, l, app),
+              ),
             ],
           ),
         ),
@@ -107,7 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Bible',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1)),
+                style: TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.w800, height: 1)),
             Text('Companion',
                 style: TextStyle(
                     fontSize: 14,
@@ -122,22 +131,26 @@ class _HomeScreenState extends State<HomeScreen> {
           onPressed: () => LanguageSheet.show(context),
         ),
         IconButton(
-          tooltip: 'Theme',
-          icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
-          onPressed: () => settings.setThemeMode(isDark ? ThemeMode.light : ThemeMode.dark),
+          tooltip: l.t('theme'),
+          icon: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+          onPressed: () =>
+              settings.setThemeMode(isDark ? ThemeMode.light : ThemeMode.dark),
         ),
       ],
     );
   }
 
   Widget _greeting(BuildContext context, String name) {
+    final l = AppLocalizations.of(context);
     return Row(
       children: [
         Expanded(
-          child: Text('Hello, $name!',
+          child: Text(l.t('greeting_hello').replaceAll('{name}', name),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+              style:
+                  const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
         ),
         GestureDetector(
           onTap: () => Navigator.of(context)
@@ -147,7 +160,9 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: AppColors.brand,
             child: Text(name.isNotEmpty ? name[0].toUpperCase() : '•',
                 style: const TextStyle(
-                    color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800)),
           ),
         ),
       ],
@@ -172,9 +187,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(l.t('daily_verse'),
                       style: const TextStyle(
-                          color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800)),
                   Text(_todayLabel(),
-                      style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 12)),
                 ],
               ),
               const Spacer(),
@@ -187,19 +205,24 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             _verse?.text ?? '…',
             style: const TextStyle(
-                color: Colors.white, fontSize: 18, height: 1.5, fontWeight: FontWeight.w500),
+                color: Colors.white,
+                fontSize: 18,
+                height: 1.5,
+                fontWeight: FontWeight.w500),
           ),
           if (_verse != null) ...[
             const SizedBox(height: 16),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(_verse!.reference,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w700)),
               ),
             ),
           ],
@@ -224,8 +247,18 @@ class _HomeScreenState extends State<HomeScreen> {
   String _todayLabel() {
     final d = DateTime.now();
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${d.day} ${months[d.month - 1]} ${d.year}';
   }
@@ -239,13 +272,15 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Expanded(
               child: Text(l.t('how_are_you_feeling'),
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w700)),
             ),
             GestureDetector(
-              onTap: () => Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const DiscoverScreen())),
+              onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DiscoverScreen())),
               child: Text(l.t('view_all'),
-                  style: const TextStyle(color: AppColors.brand, fontWeight: FontWeight.w600)),
+                  style: const TextStyle(
+                      color: AppColors.brand, fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -260,7 +295,8 @@ class _HomeScreenState extends State<HomeScreen> {
               final (id, icon, color) = _emotions[i];
               return GestureDetector(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => EmotionDetailScreen(id: id, icon: icon, color: color),
+                  builder: (_) =>
+                      EmotionDetailScreen(id: id, icon: icon, color: color),
                 )),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -274,7 +310,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 8),
                       Text(l.t('emotion_${id}_title'),
                           style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.w700)),
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
@@ -302,7 +339,8 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(l.t('bible_reading'),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -319,11 +357,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         value: pct,
                         strokeWidth: 8,
                         backgroundColor: Theme.of(context).dividerColor,
-                        valueColor: const AlwaysStoppedAnimation(AppColors.brand),
+                        valueColor:
+                            const AlwaysStoppedAnimation(AppColors.brand),
                       ),
                     ),
                     Text('${(pct * 100).toStringAsFixed(1)}%',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w800)),
                   ],
                 ),
               ),
@@ -332,9 +372,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _readingStat(Icons.check_circle, AppColors.green, l.t('days_completed'), '$done'),
+                    _readingStat(Icons.check_circle, AppColors.green,
+                        l.t('days_completed'), '$done'),
                     const SizedBox(height: 12),
-                    _readingStat(Icons.schedule, AppColors.brand, l.t('remaining'), '$remaining'),
+                    _readingStat(Icons.schedule, AppColors.brand,
+                        l.t('remaining'), '$remaining'),
                   ],
                 ),
               ),
@@ -342,8 +384,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 18),
           FilledButton.icon(
-            onPressed: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const ReadingPlanScreen())),
+            onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ReadingPlanScreen())),
             icon: const Icon(Icons.calendar_month),
             label: Text(l.t('bible_reading_plan')),
           ),
@@ -358,8 +400,10 @@ class _HomeScreenState extends State<HomeScreen> {
         Icon(icon, color: color, size: 20),
         const SizedBox(width: 8),
         Text('$label: ',
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        Text(value,
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
       ],
     );
   }

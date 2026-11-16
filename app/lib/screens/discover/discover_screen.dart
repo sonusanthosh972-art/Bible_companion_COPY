@@ -48,7 +48,8 @@ class DiscoverScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(l.t('discover_subtitle'),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 16),
           GridView.count(
             crossAxisCount: 2,
@@ -61,7 +62,8 @@ class DiscoverScreen extends StatelessWidget {
               for (final (id, icon, color) in _emotions)
                 AppCard(
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => EmotionDetailScreen(id: id, icon: icon, color: color),
+                    builder: (_) =>
+                        EmotionDetailScreen(id: id, icon: icon, color: color),
                   )),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,7 +96,8 @@ class DiscoverScreen extends StatelessWidget {
 /// through the verses over a colour-themed background, read them aloud, or
 /// share one. Mirrors the reference app's "feeling" detail page.
 class EmotionDetailScreen extends StatefulWidget {
-  const EmotionDetailScreen({super.key, required this.id, required this.icon, required this.color});
+  const EmotionDetailScreen(
+      {super.key, required this.id, required this.icon, required this.color});
   final String id;
   final IconData icon;
   final Color color;
@@ -117,7 +120,9 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
   TtsService? _tts;
   MusicService? _music;
   bool _musicStarted = false;
-  SectionImage? _bg;
+  // One background image per verse — swaps as the user scrolls.
+  List<SectionImage> _bgs = const [];
+  SectionImage? get _bg => _bgs.isEmpty ? null : _bgs[_page % _bgs.length];
 
   @override
   void initState() {
@@ -144,8 +149,9 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
 
   Future<void> _loadBackground() async {
     final query = kEmotionImageQuery[widget.id] ?? 'peaceful landscape nature';
-    final img = await _images.forQuery(query, orientation: 'portrait');
-    if (mounted && img != null) setState(() => _bg = img);
+    final imgs =
+        await _images.forQueryList(query, count: 6, orientation: 'portrait');
+    if (mounted && imgs.isNotEmpty) setState(() => _bgs = imgs);
   }
 
   @override
@@ -176,13 +182,20 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
   }
 
   // Dark, saturated gradient tinted with the emotion's colour.
-  Color _tint(double lightness) =>
-      HSLColor.fromColor(widget.color).withSaturation(0.5).withLightness(lightness).toColor();
+  Color _tint(double lightness) => HSLColor.fromColor(widget.color)
+      .withSaturation(0.5)
+      .withLightness(lightness)
+      .toColor();
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final isEn = l.locale.languageCode == 'en';
+    // Decode the full-screen background at the display's physical width, not the
+    // photo's native resolution — a big memory saving on low-end devices.
+    final decodeWidth = (MediaQuery.sizeOf(context).width *
+            MediaQuery.devicePixelRatioOf(context))
+        .round();
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -191,12 +204,15 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
         elevation: 0,
         foregroundColor: Colors.white,
         title: Text(l.t('emotion_${widget.id}_title'),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w700)),
         actions: [
           // Background music toggle — plays by default, tap to mute/unmute.
           Consumer<MusicService>(
             builder: (context, music, _) => IconButton(
-              tooltip: music.muted ? l.t('praise_music_off') : l.t('praise_music_on'),
+              tooltip: music.muted
+                  ? l.t('praise_music_off')
+                  : l.t('praise_music_on'),
               icon: Icon(music.muted ? Icons.music_off : Icons.music_note),
               onPressed: () => music.toggleMute(),
             ),
@@ -240,32 +256,47 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
               ),
             ),
           ),
-          // Themed stock photo (cached), fading in over the gradient.
-          if (_bg != null)
-            CachedNetworkImage(
-              imageUrl: _bg!.url,
-              fit: BoxFit.cover,
-              fadeInDuration: const Duration(milliseconds: 500),
-              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+          // Themed stock photo for the current verse — crossfades as you scroll.
+          // Wrapped in a RepaintBoundary so scrolling verses / page-indicator
+          // animations don't repaint this full-screen image layer.
+          RepaintBoundary(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 600),
+              child: _bg == null
+                  ? const SizedBox.shrink()
+                  : Stack(
+                      key: ValueKey(_bg!.url),
+                      fit: StackFit.expand,
+                      children: [
+                        CachedNetworkImage(
+                          imageUrl: _bg!.url,
+                          fit: BoxFit.cover,
+                          memCacheWidth: decodeWidth,
+                          fadeInDuration: const Duration(milliseconds: 400),
+                          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                        // Dark scrim so the white serif text stays readable.
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.55),
+                                Colors.black.withValues(alpha: 0.35),
+                                Colors.black.withValues(alpha: 0.62),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
-          // Dark scrim so the white serif text stays readable over any photo.
-          if (_bg != null)
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.55),
-                    Colors.black.withValues(alpha: 0.35),
-                    Colors.black.withValues(alpha: 0.62),
-                  ],
-                ),
-              ),
-            ),
+          ),
           SafeArea(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white))
                 : _failed
                     ? _errorView(l)
                     : _pager(l, isEn),
@@ -281,7 +312,8 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off_outlined, size: 44, color: Colors.white70),
+              const Icon(Icons.cloud_off_outlined,
+                  size: 44, color: Colors.white70),
               const SizedBox(height: 12),
               Text(l.t('auth_error_network'),
                   textAlign: TextAlign.center,
@@ -289,7 +321,8 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
               const SizedBox(height: 16),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white24, foregroundColor: Colors.white),
+                    backgroundColor: Colors.white24,
+                    foregroundColor: Colors.white),
                 onPressed: () => _load(_loadedLang ?? 'en'),
                 icon: const Icon(Icons.refresh),
                 label: Text(l.t('game_retry')),
@@ -326,7 +359,8 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
                       width: 7,
                       height: i == _page ? 20 : 7,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: i == _page ? 0.95 : 0.4),
+                        color: Colors.white
+                            .withValues(alpha: i == _page ? 0.95 : 0.4),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -349,16 +383,19 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
                     _bg!.credit,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6), fontSize: 11),
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 11),
                   ),
                 ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.menu_book_rounded, size: 18, color: Colors.white70),
+                  const Icon(Icons.menu_book_rounded,
+                      size: 18, color: Colors.white70),
                   const SizedBox(width: 8),
                   Text(l.t('app_name'),
-                      style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 14)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -366,7 +403,8 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.white.withValues(alpha: 0.18),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 26, vertical: 12),
                 ),
                 onPressed: _verses.isEmpty ? null : _shareCurrent,
                 icon: const Icon(Icons.share_outlined, size: 18),

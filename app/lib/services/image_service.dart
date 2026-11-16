@@ -49,25 +49,58 @@ class ImageService {
     final key = '$orientation:$query';
     if (_cache.containsKey(key)) return _cache[key];
     try {
-      final token = await _tokens.read();
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/images').replace(
-        queryParameters: {'query': query, 'orientation': orientation},
-      );
-      final res = await http.get(
-        uri,
-        headers: {
-          if (token != null && token.isNotEmpty) 'authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 20));
-      if (res.statusCode == 200) {
-        final img = SectionImage.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      final res = await _get({'query': query, 'orientation': orientation});
+      if (res != null) {
+        final img = SectionImage.fromJson(jsonDecode(res) as Map<String, dynamic>);
         _cache[key] = img;
         return img;
       }
     } catch (_) {
       // ignore — caller falls back to a gradient
     }
-    _cache[key] = null; // remember the miss for this session
+    _cache[key] = null;
     return null;
+  }
+
+  static final Map<String, List<SectionImage>> _listCache = {};
+
+  /// Fetches up to [count] images for [query] — one per verse, so the
+  /// background can change as the user scrolls.
+  Future<List<SectionImage>> forQueryList(String query,
+      {int count = 5, String orientation = 'portrait'}) async {
+    final key = '$orientation:n$count:$query';
+    final cached = _listCache[key];
+    if (cached != null) return cached;
+    try {
+      final res = await _get({
+        'query': query,
+        'orientation': orientation,
+        'count': '$count',
+      });
+      if (res != null) {
+        final data = jsonDecode(res) as Map<String, dynamic>;
+        final list = (data['images'] as List? ?? const [])
+            .map((e) => SectionImage.fromJson(e as Map<String, dynamic>))
+            .toList();
+        _listCache[key] = list;
+        return list;
+      }
+    } catch (_) {
+      // ignore — caller falls back to a gradient
+    }
+    _listCache[key] = const [];
+    return const [];
+  }
+
+  Future<String?> _get(Map<String, String> params) async {
+    final token = await _tokens.read();
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/images').replace(queryParameters: params);
+    final res = await http.get(
+      uri,
+      headers: {
+        if (token != null && token.isNotEmpty) 'authorization': 'Bearer $token',
+      },
+    ).timeout(const Duration(seconds: 20));
+    return res.statusCode == 200 ? res.body : null;
   }
 }

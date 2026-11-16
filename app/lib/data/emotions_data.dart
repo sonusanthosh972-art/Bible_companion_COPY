@@ -49,20 +49,22 @@ const Map<String, List<VerseRef>> kEmotionVerses = {
 
 /// Wholesome, nature-focused stock-image search terms per emotion. Sent to the
 /// backend image proxy; chosen to stay peaceful, spiritual and non-figurative.
+// Broad (2–3 word) nature terms so Wikimedia returns many candidates — the
+// detail page shows a different one per verse. Keep them wholesome/scenic.
 const Map<String, String> kEmotionImageQuery = {
-  'peace': 'calm peaceful lake mountains serene nature',
-  'hope': 'sunrise golden dawn sky horizon',
-  'strength': 'majestic mountain peak landscape sky',
-  'fear': 'calm sheltering sky soft light clouds',
-  'healing': 'gentle sunlight forest stream nature',
-  'joy': 'sunlight meadow wildflowers bright field',
-  'love': 'warm sunset golden light nature',
-  'wisdom': 'quiet morning light calm path',
-  'trust': 'tranquil forest path sunlight',
-  'grief': 'soft dawn calm sea gentle light',
-  'forgiveness': 'open sunrise sky freedom horizon',
-  'worry': 'still calm water reflection serene',
-  'anxiety': 'calm still lake peaceful morning mist',
+  'peace': 'calm lake mountains',
+  'hope': 'sunrise sky clouds',
+  'strength': 'mountain landscape',
+  'fear': 'peaceful nature landscape',
+  'healing': 'forest sunlight path',
+  'joy': 'sunset golden sky',
+  'love': 'warm sunset sky',
+  'wisdom': 'mountain landscape sky',
+  'trust': 'forest sunlight path',
+  'grief': 'still water reflection',
+  'forgiveness': 'sunrise sky clouds',
+  'worry': 'ocean sea calm',
+  'anxiety': 'still water reflection',
 };
 
 /// Each emotion maps to one of three instrumental music moods, served by the

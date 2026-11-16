@@ -1,7 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/image_service.dart';
 import '../../services/praise_data.dart';
 import '../../services/tts_service.dart';
 import '../../widgets/language_sheet.dart';
@@ -20,12 +22,34 @@ class PraiseScreen extends StatefulWidget {
 
 class _PraiseScreenState extends State<PraiseScreen> {
   static const _counts = [100, 200, 500, 750, 1000];
+  static const _defaultPraiseBg =
+      'https://images.unsplash.com/photo-1507692049790-de58290a4334?q=80&w=1200&auto=format&fit=crop';
+
   int _count = 100;
   int _index = 0; // praise shown while idle / last line spoken
 
   List<PraiseItem> _praises = const [];
   String? _loadedLang;
   TtsService? _tts;
+  String? _bgUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBackgroundImage();
+  }
+
+  Future<void> _loadBackgroundImage() async {
+    try {
+      final img = await ImageService()
+          .forQuery('praise worship sunrise nature', orientation: 'landscape');
+      if (mounted && img != null && img.url.isNotEmpty) {
+        setState(() => _bgUrl = img.url);
+      }
+    } catch (_) {
+      // Fallback is handled automatically via _defaultPraiseBg
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -101,7 +125,8 @@ class _PraiseScreenState extends State<PraiseScreen> {
           _banner(l),
           const SizedBox(height: 20),
           Text(l.t('praise_count_heading'),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           Wrap(
             spacing: 10,
@@ -137,40 +162,99 @@ class _PraiseScreenState extends State<PraiseScreen> {
     return Container(
       height: 190,
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [Color(0xFFE6A94D), Color(0xFFB9772E)],
         ),
-        borderRadius: BorderRadius.circular(22),
       ),
-      alignment: Alignment.center,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          Text(l.t('praise').toUpperCase(),
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 30,
-                  letterSpacing: 4,
-                  fontWeight: FontWeight.w800)),
-          const SizedBox(height: 10),
-          Text(
-            '“${l.t('praise_line_12')}”',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontStyle: FontStyle.italic,
-                height: 1.4),
+          CachedNetworkImage(
+            imageUrl: _bgUrl ?? _defaultPraiseBg,
+            fit: BoxFit.cover,
+            memCacheWidth: (MediaQuery.sizeOf(context).width *
+                    MediaQuery.devicePixelRatioOf(context))
+                .round(),
+            fadeInDuration: const Duration(milliseconds: 400),
+            placeholder: (_, __) => const SizedBox.expand(),
+            errorWidget: (_, __, ___) => const SizedBox.expand(),
           ),
-          const SizedBox(height: 6),
-          Text('PSALM 150:6',
-              style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 12,
-                  letterSpacing: 2)),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.45),
+                  Colors.black.withValues(alpha: 0.25),
+                  Colors.black.withValues(alpha: 0.60),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  l.t('praise').toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 30,
+                    letterSpacing: 4,
+                    fontWeight: FontWeight.w800,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 10,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '“${l.t('praise_line_12')}”',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontStyle: FontStyle.italic,
+                    height: 1.4,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 8,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'PSALM 150:6',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 12,
+                    letterSpacing: 2,
+                    fontWeight: FontWeight.w600,
+                    shadows: const [
+                      Shadow(
+                        color: Colors.black54,
+                        blurRadius: 6,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -190,7 +274,8 @@ class _PraiseScreenState extends State<PraiseScreen> {
     } else if (introNow) {
       shownText = l.t('praise_intro');
     } else {
-      final idx = (running ? (seqPos - 1) : _index).clamp(0, _praises.length - 1);
+      final idx =
+          (running ? (seqPos - 1) : _index).clamp(0, _praises.length - 1);
       shownText = _praises[idx].text;
     }
 
@@ -241,8 +326,8 @@ class _PraiseScreenState extends State<PraiseScreen> {
           ),
           Text(
             '${pos.clamp(0, _count)} / $_count',
-            style:
-                TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 10),
           Row(

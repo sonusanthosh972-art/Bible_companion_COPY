@@ -23,12 +23,20 @@ class BibleException implements Exception {
 /// Book ids (GEN, EXO, … MAT) are identical across translations, so switching
 /// language only swaps the translation — navigation state stays valid.
 class BibleService {
-  BibleService({http.Client? client}) : _http = client ?? http.Client();
+  // Screens create a BibleService each; they share one process-wide HTTP client
+  // (and the static caches below) so there's no per-screen connection pool to
+  // leak. A test can still inject its own client.
+  BibleService({http.Client? client})
+      : _http = client ?? _sharedClient,
+        _ownsClient = client != null;
+
+  static final http.Client _sharedClient = http.Client();
 
   static const _base = 'https://bible.helloao.org/api';
   static const _timeout = Duration(seconds: 20);
 
   final http.Client _http;
+  final bool _ownsClient;
 
   // In-memory caches so re-opening a book/chapter is instant and offline-safe
   // within a session. Static so every screen's BibleService shares one cache —
@@ -38,11 +46,26 @@ class BibleService {
 
   /// Well-known verses cycled by day-of-year for the home screen.
   static const _dailyRefs = <(String, int, int)>[
-    ('JHN', 3, 16), ('PSA', 23, 1), ('PHP', 4, 13), ('ROM', 8, 28),
-    ('JER', 29, 11), ('PRO', 3, 5), ('ISA', 41, 10), ('MAT', 6, 33),
-    ('PSA', 46, 1), ('JOS', 1, 9), ('PHP', 4, 6), ('ROM', 12, 2),
-    ('2CO', 5, 7), ('PSA', 118, 24), ('1CO', 13, 4), ('GAL', 2, 20),
-    ('HEB', 11, 1), ('PSA', 37, 4), ('MAT', 11, 28), ('ISA', 40, 31),
+    ('JHN', 3, 16),
+    ('PSA', 23, 1),
+    ('PHP', 4, 13),
+    ('ROM', 8, 28),
+    ('JER', 29, 11),
+    ('PRO', 3, 5),
+    ('ISA', 41, 10),
+    ('MAT', 6, 33),
+    ('PSA', 46, 1),
+    ('JOS', 1, 9),
+    ('PHP', 4, 6),
+    ('ROM', 12, 2),
+    ('2CO', 5, 7),
+    ('PSA', 118, 24),
+    ('1CO', 13, 4),
+    ('GAL', 2, 20),
+    ('HEB', 11, 1),
+    ('PSA', 37, 4),
+    ('MAT', 11, 28),
+    ('ISA', 40, 31),
   ];
 
   String translationFor(String lang) => switch (lang) {
@@ -96,7 +119,8 @@ class BibleService {
     if (cached != null) return cached;
 
     final data = await _getJson('/$t/$bookId/$chapter.json');
-    final content = ((data['chapter'] as Map?)?['content'] as List?) ?? const [];
+    final content =
+        ((data['chapter'] as Map?)?['content'] as List?) ?? const [];
     final verses = <BibleVerse>[];
     for (final item in content) {
       if (item is Map && item['type'] == 'verse') {
@@ -170,5 +194,8 @@ class BibleService {
     return null;
   }
 
-  void dispose() => _http.close();
+  // Only close a client we own (injected in tests); never the shared one.
+  void dispose() {
+    if (_ownsClient) _http.close();
+  }
 }

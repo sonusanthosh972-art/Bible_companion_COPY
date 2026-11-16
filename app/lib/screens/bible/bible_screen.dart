@@ -17,7 +17,8 @@ class BibleScreen extends StatefulWidget {
   State<BibleScreen> createState() => _BibleScreenState();
 }
 
-class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStateMixin {
+class _BibleScreenState extends State<BibleScreen>
+    with SingleTickerProviderStateMixin {
   final _bible = BibleService();
   late final TabController _tabs = TabController(length: 3, vsync: this);
 
@@ -109,20 +110,24 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {
-          return _error(l, () => setState(() => _booksFuture = _bible.books(_loadedLang ?? 'en')));
+          return _error(
+              l,
+              () => setState(
+                  () => _booksFuture = _bible.books(_loadedLang ?? 'en')));
         }
         final all = snap.data ?? [];
-        final byTestament =
-            all.where((b) => _newTestament ? b.order >= 40 : b.order <= 39);
+        final byTestament = all
+            .where((b) => _newTestament ? !b.isOldTestament : b.isOldTestament);
         final filtered = _query.isEmpty
             ? byTestament
-            : all.where((b) => b.name.toLowerCase().contains(_query.toLowerCase()));
+            : all.where(
+                (b) => b.name.toLowerCase().contains(_query.toLowerCase()));
         final books = filtered.toList();
 
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
               child: TextField(
                 onChanged: (v) => setState(() => _query = v),
                 decoration: InputDecoration(
@@ -138,22 +143,35 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
             ),
             if (_query.isEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                 child: Row(
                   children: [
-                    _testamentTab(l.t('old_testament'), !_newTestament,
-                        () => setState(() => _newTestament = false)),
-                    const SizedBox(width: 24),
-                    _testamentTab(l.t('new_testament'), _newTestament,
-                        () => setState(() => _newTestament = true)),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: _testamentTab(
+                            l.t('old_testament'),
+                            !_newTestament,
+                            () => setState(() => _newTestament = false)),
+                      ),
+                    ),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: _testamentTab(
+                            l.t('new_testament'),
+                            _newTestament,
+                            () => setState(() => _newTestament = true)),
+                      ),
+                    ),
                   ],
                 ),
               ),
             Expanded(
               child: ListView.separated(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
                 itemCount: books.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, __) => const SizedBox(height: 14),
                 itemBuilder: (context, i) {
                   final b = books[i];
                   final (icon, color) = _styles[b.order % _styles.length];
@@ -164,25 +182,30 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
                       borderRadius: BorderRadius.circular(16),
                       onTap: () => _openBook(b),
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 16),
                         child: Row(
                           children: [
                             Container(
-                              width: 44,
-                              height: 44,
+                              width: 40,
+                              height: 40,
                               decoration: BoxDecoration(
                                 color: color,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(icon, color: Colors.white, size: 22),
+                              child: Icon(icon, color: Colors.white, size: 20),
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: Text(b.name,
                                   style: const TextStyle(
-                                      fontSize: 17, fontWeight: FontWeight.w700)),
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w700)),
                             ),
-                            const Icon(Icons.chevron_right),
+                            Icon(Icons.chevron_right,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant),
                           ],
                         ),
                       ),
@@ -199,22 +222,20 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
 
   Widget _testamentTab(String label, bool selected, VoidCallback onTap) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Column(
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: selected
-                      ? AppColors.brand
-                      : Theme.of(context).colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 4),
-          if (selected)
-            Container(width: 30, height: 3, color: AppColors.brand)
-          else
-            const SizedBox(height: 3),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: selected
+                ? AppColors.brand
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
       ),
     );
   }
@@ -245,7 +266,8 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
                     ),
                     alignment: Alignment.center,
                     child: Text('$c',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700)),
                   ),
                 ),
             ],
@@ -265,7 +287,8 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
         _crumb('${_book!.name} ${l.t('chapters')} $_chapter'),
         Expanded(
           child: FutureBuilder<List<BibleVerse>>(
-            future: _bible.chapterVerses(_loadedLang ?? 'en', _book!.id, _chapter!),
+            future:
+                _bible.chapterVerses(_loadedLang ?? 'en', _book!.id, _chapter!),
             builder: (context, snap) {
               if (snap.connectionState != ConnectionState.done) {
                 return const Center(child: CircularProgressIndicator());
@@ -295,7 +318,8 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
                                 TextSpan(
                                   text: '${v.number}  ',
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.bold, color: AppColors.brand),
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.brand),
                                 ),
                                 TextSpan(text: v.text),
                               ],
@@ -340,8 +364,12 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
               },
               icon: loading
                   ? const SizedBox(
-                      width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Icon(active ? Icons.stop_circle_outlined : Icons.volume_up_outlined),
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(active
+                      ? Icons.stop_circle_outlined
+                      : Icons.volume_up_outlined),
               label: Text(active ? l.t('praise_pause') : l.t('praise_play')),
             ),
           ),
@@ -355,7 +383,8 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         color: AppColors.brand.withValues(alpha: 0.08),
         child: Text(text,
-            style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.brand)),
+            style: const TextStyle(
+                fontWeight: FontWeight.w700, color: AppColors.brand)),
       );
 
   Widget _hint(String whatToPick) => Center(
@@ -365,7 +394,8 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.touch_app_outlined,
-                  size: 44, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  size: 44,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
               const SizedBox(height: 12),
               Text('→ $whatToPick', textAlign: TextAlign.center),
             ],
