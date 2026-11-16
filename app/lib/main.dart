@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'app.dart';
+import 'services/music_service.dart';
 import 'services/tts_service.dart';
 import 'state/app_state.dart';
 import 'state/settings_state.dart';
@@ -23,6 +24,7 @@ Future<void> main() async {
         ChangeNotifierProvider.value(value: settings),
         ChangeNotifierProvider.value(value: appState),
         ChangeNotifierProvider(create: (_) => TtsService()),
+        ChangeNotifierProvider(create: (_) => MusicService()),
       ],
       child: const BibleCompanionApp(),
     ),

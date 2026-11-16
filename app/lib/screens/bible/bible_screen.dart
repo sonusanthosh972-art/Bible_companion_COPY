@@ -329,11 +329,11 @@ class _BibleScreenState extends State<BibleScreen> with SingleTickerProviderStat
             child: OutlinedButton.icon(
               onPressed: () async {
                 try {
-                  await tts.toggle(id, text);
+                  await tts.toggle(id, text, lang: l.locale.languageCode);
                 } catch (_) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l.t('auth_error_network'))),
+                      SnackBar(content: Text(l.t('tts_unavailable'))),
                     );
                   }
                 }

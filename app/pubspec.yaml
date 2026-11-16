@@ -23,6 +23,12 @@ dependencies:
   # Audio (text-to-speech playback)
   audioplayers: ^6.1.0
 
+  # Native share sheet (share a verse)
+  share_plus: ^10.1.4
+
+  # Cached, optimized network images (stock photo backgrounds)
+  cached_network_image: ^3.4.1
+
   # Local storage
   sqflite: ^2.3.3
   path: ^1.9.0
@@ -45,6 +51,7 @@ flutter:
     - assets/locales/ta.json
     - assets/locales/hi.json
     - assets/database/
+    - assets/praises/
   fonts:
     - family: NotoSansDevanagari
       fonts:

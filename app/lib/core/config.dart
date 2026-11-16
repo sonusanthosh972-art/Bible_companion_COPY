@@ -15,7 +15,9 @@ class AppConfig {
   //   flutter run --dart-define=API_BASE_URL=http://<host>:8080/v1
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8080/v1',
+    // Hosted backend (Render). Override for local dev with:
+    //   flutter run --dart-define=API_BASE_URL=http://localhost:8080/v1
+    defaultValue: 'https://biblecompanion-backend.onrender.com/v1',
   );
 
   static const List<String> supportedLanguages = ['en', 'ta', 'hi'];

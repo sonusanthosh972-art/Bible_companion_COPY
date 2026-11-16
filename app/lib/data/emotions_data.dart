@@ -46,3 +46,39 @@ const Map<String, List<VerseRef>> kEmotionVerses = {
     ('PHP', 4, 6), ('1PE', 5, 7), ('PSA', 94, 19), ('MAT', 11, 28), ('ISA', 41, 10),
   ],
 };
+
+/// Wholesome, nature-focused stock-image search terms per emotion. Sent to the
+/// backend image proxy; chosen to stay peaceful, spiritual and non-figurative.
+const Map<String, String> kEmotionImageQuery = {
+  'peace': 'calm peaceful lake mountains serene nature',
+  'hope': 'sunrise golden dawn sky horizon',
+  'strength': 'majestic mountain peak landscape sky',
+  'fear': 'calm sheltering sky soft light clouds',
+  'healing': 'gentle sunlight forest stream nature',
+  'joy': 'sunlight meadow wildflowers bright field',
+  'love': 'warm sunset golden light nature',
+  'wisdom': 'quiet morning light calm path',
+  'trust': 'tranquil forest path sunlight',
+  'grief': 'soft dawn calm sea gentle light',
+  'forgiveness': 'open sunrise sky freedom horizon',
+  'worry': 'still calm water reflection serene',
+  'anxiety': 'calm still lake peaceful morning mist',
+};
+
+/// Each emotion maps to one of three instrumental music moods, served by the
+/// backend at /v1/music/<mood>.mp3 and looped softly behind the verses.
+const Map<String, String> kEmotionMood = {
+  'peace': 'calm',
+  'trust': 'calm',
+  'healing': 'calm',
+  'grief': 'calm',
+  'worry': 'calm',
+  'anxiety': 'calm',
+  'forgiveness': 'calm',
+  'fear': 'calm',
+  'hope': 'hopeful',
+  'joy': 'hopeful',
+  'love': 'hopeful',
+  'strength': 'strong',
+  'wisdom': 'strong',
+};

@@ -1,9 +1,13 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../data/emotions_data.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/bible_service.dart';
+import '../../services/image_service.dart';
+import '../../services/music_service.dart';
+import '../../services/tts_service.dart';
 import '../../state/settings_state.dart';
 import '../../widgets/common.dart';
 import '../../widgets/language_sheet.dart';
@@ -86,6 +90,9 @@ class DiscoverScreen extends StatelessWidget {
   }
 }
 
+/// Immersive, full-screen verse viewer for one emotion — swipe vertically
+/// through the verses over a colour-themed background, read them aloud, or
+/// share one. Mirrors the reference app's "feeling" detail page.
 class EmotionDetailScreen extends StatefulWidget {
   const EmotionDetailScreen({super.key, required this.id, required this.icon, required this.color});
   final String id;
@@ -96,111 +103,330 @@ class EmotionDetailScreen extends StatefulWidget {
   State<EmotionDetailScreen> createState() => _EmotionDetailState();
 }
 
+typedef _Verse = ({String text, String reference});
+
 class _EmotionDetailState extends State<EmotionDetailScreen> {
   final _bible = BibleService();
-  Future<List<({String text, String reference})>>? _future;
+  final _images = ImageService();
+  final _pageCtrl = PageController();
+  List<_Verse> _verses = const [];
+  bool _loading = true;
+  bool _failed = false;
   String? _loadedLang;
+  int _page = 0;
+  TtsService? _tts;
+  MusicService? _music;
+  bool _musicStarted = false;
+  SectionImage? _bg;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBackground(); // emotion is fixed — load once, independent of language
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _tts = context.read<TtsService>();
+    _music = context.read<MusicService>();
+    // Start the mood music on first open (plays by default; user can mute).
+    if (!_musicStarted) {
+      _musicStarted = true;
+      _music!.playMood(kEmotionMood[widget.id] ?? 'calm');
+    }
     final lang = Provider.of<SettingsState>(context).languageCode;
     if (lang != _loadedLang) {
       _loadedLang = lang;
-      _future = _loadVerses(lang);
+      _load(lang);
     }
   }
 
-  Future<List<({String text, String reference})>> _loadVerses(String lang) async {
+  Future<void> _loadBackground() async {
+    final query = kEmotionImageQuery[widget.id] ?? 'peaceful landscape nature';
+    final img = await _images.forQuery(query, orientation: 'portrait');
+    if (mounted && img != null) setState(() => _bg = img);
+  }
+
+  @override
+  void dispose() {
+    _tts?.stop();
+    _music?.stop();
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load(String lang) async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
     final refs = kEmotionVerses[widget.id] ?? const [];
     final results = await Future.wait(
       refs.map((r) => _bible.verseAt(lang, r.$1, r.$2, r.$3)),
     );
-    return results.whereType<({String text, String reference})>().toList();
+    final verses = results.whereType<_Verse>().toList();
+    if (!mounted) return;
+    setState(() {
+      _verses = verses;
+      _loading = false;
+      _failed = verses.isEmpty;
+      _page = 0;
+    });
   }
+
+  // Dark, saturated gradient tinted with the emotion's colour.
+  Color _tint(double lightness) =>
+      HSLColor.fromColor(widget.color).withSaturation(0.5).withLightness(lightness).toColor();
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final titleKey = 'emotion_${widget.id}_title';
+    final isEn = l.locale.languageCode == 'en';
+
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(l.t(titleKey)),
-        actions: const [LanguageAction()],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [widget.color.withValues(alpha: 0.9), widget.color.withValues(alpha: 0.6)],
-              ),
-              borderRadius: BorderRadius.circular(22),
-            ),
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                Icon(widget.icon, color: Colors.white, size: 40),
-                const SizedBox(height: 12),
-                Text(l.t(titleKey),
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                Text(l.t('words_comfort_strength'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13)),
-              ],
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white,
+        title: Text(l.t('emotion_${widget.id}_title'),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        actions: [
+          // Background music toggle — plays by default, tap to mute/unmute.
+          Consumer<MusicService>(
+            builder: (context, music, _) => IconButton(
+              tooltip: music.muted ? l.t('praise_music_off') : l.t('praise_music_on'),
+              icon: Icon(music.muted ? Icons.music_off : Icons.music_note),
+              onPressed: () => music.toggleMute(),
             ),
           ),
-          const SizedBox(height: 20),
-          Row(children: [
-            const Icon(Icons.menu_book_outlined, size: 18, color: AppColors.brand),
-            const SizedBox(width: 8),
-            Text(l.t('emotion_verses'),
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          ]),
-          const SizedBox(height: 12),
-          FutureBuilder<List<({String text, String reference})>>(
-            future: _future,
-            builder: (context, snap) {
-              if (snap.connectionState != ConnectionState.done) {
-                return const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              final verses = snap.data ?? [];
-              if (verses.isEmpty) {
-                return AppCard(child: Text(l.t('auth_error_network')));
-              }
-              return Column(
-                children: [
-                  for (final v in verses)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: AppCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(v.text,
-                                style: const TextStyle(fontSize: 16, height: 1.7)),
-                            const SizedBox(height: 8),
-                            Text(v.reference,
-                                style: const TextStyle(
-                                    color: AppColors.brand,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
+          // Read the current verse aloud (text-to-speech).
+          Consumer<TtsService>(
+            builder: (context, tts, _) {
+              final active = tts.isActive('emotion');
+              return IconButton(
+                tooltip: l.t('praise_play'),
+                icon: Icon(active ? Icons.volume_up : Icons.volume_up_outlined),
+                onPressed: _verses.isEmpty
+                    ? null
+                    : () async {
+                        try {
+                          await tts.toggle('emotion', _verses[_page].text,
+                              lang: l.locale.languageCode);
+                        } catch (_) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(l.t('tts_unavailable'))),
+                            );
+                          }
+                        }
+                      },
               );
             },
           ),
         ],
       ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Base colour gradient — always present (fallback + while image loads).
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [_tint(0.30), _tint(0.14), _tint(0.08)],
+              ),
+            ),
+          ),
+          // Themed stock photo (cached), fading in over the gradient.
+          if (_bg != null)
+            CachedNetworkImage(
+              imageUrl: _bg!.url,
+              fit: BoxFit.cover,
+              fadeInDuration: const Duration(milliseconds: 500),
+              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          // Dark scrim so the white serif text stays readable over any photo.
+          if (_bg != null)
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.55),
+                    Colors.black.withValues(alpha: 0.35),
+                    Colors.black.withValues(alpha: 0.62),
+                  ],
+                ),
+              ),
+            ),
+          SafeArea(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                : _failed
+                    ? _errorView(l)
+                    : _pager(l, isEn),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _errorView(AppLocalizations l) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_outlined, size: 44, color: Colors.white70),
+              const SizedBox(height: 12),
+              Text(l.t('auth_error_network'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white)),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white24, foregroundColor: Colors.white),
+                onPressed: () => _load(_loadedLang ?? 'en'),
+                icon: const Icon(Icons.refresh),
+                label: Text(l.t('game_retry')),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _pager(AppLocalizations l, bool isEn) {
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _pageCtrl,
+          scrollDirection: Axis.vertical,
+          itemCount: _verses.length,
+          onPageChanged: (i) => setState(() => _page = i),
+          itemBuilder: (context, i) => _verseCard(_verses[i], isEn),
+        ),
+        // Vertical page indicator on the right.
+        if (_verses.length > 1)
+          Positioned(
+            right: 12,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < _verses.length; i++)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      width: 7,
+                      height: i == _page ? 20 : 7,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: i == _page ? 0.95 : 0.4),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        // Branding + share at the bottom.
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 16,
+          child: Column(
+            children: [
+              // Photo attribution (required for Unsplash, courteous for Pexels).
+              if (_bg != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    _bg!.credit,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6), fontSize: 11),
+                  ),
+                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.menu_book_rounded, size: 18, color: Colors.white70),
+                  const SizedBox(width: 8),
+                  Text(l.t('app_name'),
+                      style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.18),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 12),
+                ),
+                onPressed: _verses.isEmpty ? null : _shareCurrent,
+                icon: const Icon(Icons.share_outlined, size: 18),
+                label: Text(l.t('share')),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _verseCard(_Verse v, bool isEn) {
+    final serif = isEn ? 'serif' : null;
+    final words = v.text.trim().split(RegExp(r'\s+'));
+    final first = words.isNotEmpty ? words.first : '';
+    final rest = words.length > 1 ? words.sublist(1).join(' ') : '';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 80, 36, 120),
+      child: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(first,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontFamily: serif,
+                      color: Colors.white,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2)),
+              if (rest.isNotEmpty) const SizedBox(height: 6),
+              if (rest.isNotEmpty)
+                Text(rest,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontFamily: serif,
+                        color: Colors.white,
+                        fontSize: 26,
+                        height: 1.5)),
+              const SizedBox(height: 22),
+              Text(v.reference,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontFamily: serif,
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 18,
+                      fontStyle: FontStyle.italic)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _shareCurrent() {
+    if (_verses.isEmpty) return;
+    final v = _verses[_page];
+    final l = AppLocalizations.of(context);
+    Share.share('${v.text}\n\n${v.reference}\n\n— ${l.t('app_name')}');
   }
 }
