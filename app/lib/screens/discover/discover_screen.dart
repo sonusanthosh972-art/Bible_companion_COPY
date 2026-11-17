@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../data/emotions_data.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/bible_service.dart';
@@ -9,6 +8,7 @@ import '../../services/image_service.dart';
 import '../../services/music_service.dart';
 import '../../services/tts_service.dart';
 import '../../state/settings_state.dart';
+import '../share/share_verse_screen.dart';
 import '../../widgets/common.dart';
 import '../../widgets/language_sheet.dart';
 
@@ -465,6 +465,12 @@ class _EmotionDetailState extends State<EmotionDetailScreen> {
     if (_verses.isEmpty) return;
     final v = _verses[_page];
     final l = AppLocalizations.of(context);
-    Share.share('${v.text}\n\n${v.reference}\n\n— ${l.t('app_name')}');
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ShareVerseScreen(
+        verse: v.text,
+        reference: v.reference,
+        lang: l.locale.languageCode,
+      ),
+    ));
   }
 }

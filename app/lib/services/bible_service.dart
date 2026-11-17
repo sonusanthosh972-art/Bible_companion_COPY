@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../data/hindi_book_names.dart';
 import '../models/bible_models.dart';
 
 /// Thrown when the Bible API is unreachable or returns an error.
@@ -99,9 +100,13 @@ class BibleService {
     final books = <BibleBook>[];
     for (var i = 0; i < list.length; i++) {
       final b = list[i] as Map<String, dynamic>;
+      final id = b['id'] as String;
+      final apiName = (b['commonName'] ?? b['name'] ?? id) as String;
       books.add(BibleBook(
-        id: b['id'] as String,
-        name: (b['commonName'] ?? b['name'] ?? b['id']) as String,
+        id: id,
+        // Hindi: show the standard/traditional book name; other languages use
+        // the API's own name. Verse text is never affected.
+        name: lang == 'hi' ? (kHindiBookNames[id] ?? apiName) : apiName,
         order: i + 1,
         chapterCount: (b['numberOfChapters'] as num?)?.toInt() ?? 1,
       ));
@@ -154,7 +159,9 @@ class BibleService {
     final t = translationFor(lang);
     try {
       final data = await _getJson('/$t/$bookId/$chapter.json');
-      final bookName = ((data['book'] as Map?)?['name'] as String?) ?? bookId;
+      final apiBookName = ((data['book'] as Map?)?['name'] as String?) ?? bookId;
+      final bookName =
+          lang == 'hi' ? (kHindiBookNames[bookId] ?? apiBookName) : apiBookName;
       final content =
           ((data['chapter'] as Map?)?['content'] as List?) ?? const [];
       for (final item in content) {
@@ -177,7 +184,9 @@ class BibleService {
     final t = translationFor(lang);
     try {
       final data = await _getJson('/$t/$book/$chapter.json');
-      final bookName = ((data['book'] as Map?)?['name'] as String?) ?? book;
+      final apiBookName = ((data['book'] as Map?)?['name'] as String?) ?? book;
+      final bookName =
+          lang == 'hi' ? (kHindiBookNames[book] ?? apiBookName) : apiBookName;
       final content =
           ((data['chapter'] as Map?)?['content'] as List?) ?? const [];
       for (final item in content) {

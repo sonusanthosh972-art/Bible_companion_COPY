@@ -26,6 +26,13 @@ dependencies:
   # Native share sheet (share a verse)
   share_plus: ^10.1.4
 
+  # Pick a photo from the gallery for the "Your photo" verse-card background
+  image_picker: ^1.1.2
+
+  # Instagram-style font choices for the verse-card typography editor
+  # (Latin + Devanagari + Tamil faces, fetched and cached at runtime)
+  google_fonts: ^6.2.1
+
   # Cached, optimized network images (stock photo backgrounds)
   cached_network_image: ^3.4.1
 

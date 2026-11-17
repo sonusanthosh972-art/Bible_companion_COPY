@@ -10,6 +10,7 @@ import '../../widgets/language_sheet.dart';
 import '../discover/discover_screen.dart';
 import '../plan/reading_plan_screen.dart';
 import '../profile/profile_screen.dart';
+import '../share/share_verse_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -198,7 +199,22 @@ class _HomeScreenState extends State<HomeScreen> {
               const Spacer(),
               _circleIcon(Icons.favorite_border, l.t('like')),
               const SizedBox(width: 8),
-              _circleIcon(Icons.share, l.t('share')),
+              _circleIcon(
+                Icons.share,
+                l.t('share'),
+                onTap: _verse == null
+                    ? null
+                    : () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => ShareVerseScreen(
+                            verse: _verse!.text,
+                            reference: _verse!.reference,
+                            lang: l.locale.languageCode,
+                            userName: context.read<AppState>().isGuest
+                                ? null
+                                : context.read<AppState>().user?.displayName,
+                          ),
+                        )),
+              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -231,16 +247,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _circleIcon(IconData icon, String tooltip) => Tooltip(
+  Widget _circleIcon(IconData icon, String tooltip, {VoidCallback? onTap}) =>
+      Tooltip(
         message: tooltip,
-        child: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.18),
-            shape: BoxShape.circle,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 18),
           ),
-          child: Icon(icon, color: Colors.white, size: 18),
         ),
       );
 
